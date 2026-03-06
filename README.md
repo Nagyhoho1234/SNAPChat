@@ -30,10 +30,10 @@ AI-powered chat assistant for [ESA SNAP Desktop](https://step.esa.int/main/toolb
 
 1. Download `org-gischat-snap.jar` from [Releases](../../releases)
 2. Copy the JAR to your SNAP user modules directory:
-   - **Windows:** `%USERPROFILE%\.snap\snap-desktop\modules\`
+   - **Windows:** `%APPDATA%\SNAP\modules\`
    - **Linux/Mac:** `~/.snap/snap-desktop/modules/`
 3. Create the module config file at:
-   - **Windows:** `%USERPROFILE%\.snap\snap-desktop\config\Modules\org-gischat-snap.xml`
+   - **Windows:** `%APPDATA%\SNAP\config\Modules\org-gischat-snap.xml`
    - **Linux/Mac:** `~/.snap/snap-desktop/config/Modules/org-gischat-snap.xml`
 
    With this content:
