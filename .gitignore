@@ -1,0 +1,20 @@
+# Maven build output
+target/
+
+# IDE
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+nbproject/private/
+nbactions.xml
+nb-configuration.xml
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# SNAP user settings (may contain API keys)
+*.prefs
