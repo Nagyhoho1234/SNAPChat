@@ -28,12 +28,29 @@ AI-powered chat assistant for [ESA SNAP Desktop](https://step.esa.int/main/toolb
 
 ### Manual Install
 
-1. Download `snap-chat-1.0.0.jar` from [Releases](../../releases)
-2. Copy to your SNAP modules directory:
+1. Download `org-gischat-snap.jar` from [Releases](../../releases)
+2. Copy the JAR to your SNAP user modules directory:
    - **Windows:** `%USERPROFILE%\.snap\snap-desktop\modules\`
    - **Linux/Mac:** `~/.snap/snap-desktop/modules/`
-3. Restart SNAP Desktop
-4. Open via **Tools > GIS Chat**
+3. Create the module config file at:
+   - **Windows:** `%USERPROFILE%\.snap\snap-desktop\config\Modules\org-gischat-snap.xml`
+   - **Linux/Mac:** `~/.snap/snap-desktop/config/Modules/org-gischat-snap.xml`
+
+   With this content:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE module PUBLIC "-//NetBeans//DTD Module Status 1.0//EN"
+                           "http://www.netbeans.org/dtds/module-status-1_0.dtd">
+   <module name="org.gischat.snap">
+       <param name="autoload">false</param>
+       <param name="eager">false</param>
+       <param name="enabled">true</param>
+       <param name="jar">modules/org-gischat-snap.jar</param>
+       <param name="reloadable">false</param>
+   </module>
+   ```
+4. Restart SNAP Desktop
+5. Open via **Tools > GIS Chat**
 
 ### Build from Source
 
@@ -45,7 +62,7 @@ cd SNAPChat
 mvn package -DskipTests
 ```
 
-The JAR is produced at `target/snap-chat-1.0.0.jar`. Copy it to the modules directory above.
+The JAR is produced at `target/org-gischat-snap.jar`. Copy it to the modules directory and create the config XML as described above.
 
 ## Usage
 

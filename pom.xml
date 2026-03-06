@@ -119,16 +119,20 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
                 <configuration>
+                    <finalName>org-gischat-snap</finalName>
                     <archive>
                         <manifestEntries>
+                            <OpenIDE-Module>org.gischat.snap</OpenIDE-Module>
+                            <OpenIDE-Module-Specification-Version>1.0.0</OpenIDE-Module-Specification-Version>
+                            <OpenIDE-Module-Implementation-Version>1.0.0</OpenIDE-Module-Implementation-Version>
                             <OpenIDE-Module-Name>GIS Chat</OpenIDE-Module-Name>
                             <OpenIDE-Module-Display-Category>Tools</OpenIDE-Module-Display-Category>
                             <OpenIDE-Module-Short-Description>AI-powered chat assistant for SNAP</OpenIDE-Module-Short-Description>
-                            <OpenIDE-Module-Long-Description>
-                                AI chat panel for ESA SNAP that executes remote sensing operations via natural language.
-                                Supports Claude, GPT, Gemini (free), Ollama (free/local), and OpenAI-compatible endpoints.
-                            </OpenIDE-Module-Long-Description>
+                            <OpenIDE-Module-Long-Description>AI chat panel for ESA SNAP that executes remote sensing operations via natural language. Supports Claude, GPT, Gemini (free), Ollama (free/local), and OpenAI-compatible endpoints.</OpenIDE-Module-Long-Description>
                             <OpenIDE-Module-Layer>org/gischat/snap/layer.xml</OpenIDE-Module-Layer>
+                            <OpenIDE-Module-Requires>org.openide.modules.ModuleFormat1</OpenIDE-Module-Requires>
+                            <OpenIDE-Module-Module-Dependencies>org.esa.snap.snap.rcp > 13.0.0, org.esa.snap.snap.core > 13.0.0, org.esa.snap.snap.gpf > 13.0.0, org.esa.snap.snap.ui > 13.0.0, org.esa.snap.ceres.core > 13.0.0, org.openide.awt > 7.91, org.openide.windows > 6.100, org.openide.util > 9.31, org.openide.util.ui > 9.32</OpenIDE-Module-Module-Dependencies>
+                            <OpenIDE-Module-Public-Packages>-</OpenIDE-Module-Public-Packages>
                         </manifestEntries>
                     </archive>
                 </configuration>
