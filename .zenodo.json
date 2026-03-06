@@ -1,0 +1,38 @@
+{
+  "title": "GIS Chat for ESA SNAP: AI-Powered Chat Assistant Module",
+  "description": "An ESA SNAP Desktop module that provides an AI-powered chat panel for executing remote sensing operations via natural language. Part of the GIS Chat cross-platform suite covering ArcGIS Pro, QGIS, and ESA SNAP.",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Feh\u00e9r, Zsolt Zolt\u00e1n",
+      "affiliation": "University of Debrecen, Faculty of Agricultural and Food Sciences and Environmental Management",
+      "orcid": ""
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "GIS",
+    "ESA SNAP",
+    "large language model",
+    "natural language interface",
+    "geospatial",
+    "remote sensing",
+    "AI assistant",
+    "tool calling",
+    "Graph Processing Tool"
+  ],
+  "language": "eng",
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/Nagyhoho1234/GISChat",
+      "relation": "isPartOf",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://github.com/Nagyhoho1234/QGISChat",
+      "relation": "isPartOf",
+      "scheme": "url"
+    }
+  ]
+}
