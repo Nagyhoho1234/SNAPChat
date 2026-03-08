@@ -14,11 +14,12 @@ public class SettingsDialog extends JDialog {
     private final JSpinner maxTokensSpinner;
     private final JCheckBox confirmCheck;
     private final JCheckBox showCodeCheck;
+    private final JTextField geeProjectField;
 
     public SettingsDialog(Window owner) {
         super(owner, "GIS Chat - Settings", ModalityType.APPLICATION_MODAL);
         setLayout(new BorderLayout());
-        setMinimumSize(new Dimension(450, 380));
+        setMinimumSize(new Dimension(450, 480));
 
         JPanel form = new JPanel(new GridBagLayout());
         form.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
@@ -88,6 +89,20 @@ public class SettingsDialog extends JDialog {
         showCodeCheck = new JCheckBox("Show generated code in chat");
         gbc.gridx = 1; gbc.gridy = row;
         form.add(showCodeCheck, gbc);
+        row++;
+
+        // GEE Project
+        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        form.add(new JLabel("GEE Project ID:"), gbc);
+        geeProjectField = new JTextField(30);
+        gbc.gridx = 1; gbc.weightx = 1;
+        form.add(geeProjectField, gbc);
+        row++;
+
+        JLabel geeHelp = new JLabel("<html><small>Google Earth Engine project (optional). Requires earthengine-api and ee.Authenticate().</small></html>");
+        geeHelp.setForeground(Color.GRAY);
+        gbc.gridx = 1; gbc.gridy = row;
+        form.add(geeHelp, gbc);
 
         add(form, BorderLayout.CENTER);
 
@@ -138,6 +153,7 @@ public class SettingsDialog extends JDialog {
         maxTokensSpinner.setValue(ChatSettings.getMaxTokens());
         confirmCheck.setSelected(ChatSettings.getConfirmBeforeExecute());
         showCodeCheck.setSelected(ChatSettings.getShowGeneratedCode());
+        geeProjectField.setText(ChatSettings.getGeeProject());
     }
 
     private void save() {
@@ -149,6 +165,7 @@ public class SettingsDialog extends JDialog {
         ChatSettings.setMaxTokens((Integer) maxTokensSpinner.getValue());
         ChatSettings.setConfirmBeforeExecute(confirmCheck.isSelected());
         ChatSettings.setShowGeneratedCode(showCodeCheck.isSelected());
+        ChatSettings.setGeeProject(geeProjectField.getText().trim());
         dispose();
     }
 }

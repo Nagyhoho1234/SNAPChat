@@ -7,6 +7,8 @@ import org.openide.windows.TopComponent;
 import javax.swing.*;
 import javax.swing.text.html.HTMLEditorKit;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @TopComponent.Description(
         preferredID = "GISChatTopComponent",
@@ -26,6 +28,8 @@ public class ChatTopComponent extends TopComponent {
     private final StringBuilder chatHtml = new StringBuilder();
     private String pendingMapContext = "";
     private volatile boolean isProcessing = false;
+    private int toolDepth = 0;
+    private static final int MAX_TOOL_ROUND_TRIPS = 15;
 
     public ChatTopComponent() {
         setName("GIS Chat");
@@ -123,6 +127,7 @@ public class ChatTopComponent extends TopComponent {
 
         String mapContext = SnapContextService.getContext();
         pendingMapContext = mapContext;
+        toolDepth = 0;
 
         String userMsg = text;
         new Thread(() -> {
@@ -133,8 +138,8 @@ public class ChatTopComponent extends TopComponent {
                 SwingUtilities.invokeLater(() -> {
                     appendSystem("Error: " + e.getMessage());
                     if (e.getMessage() != null && (e.getMessage().contains("tool_result") || e.getMessage().contains("tool_use"))) {
-                        llm.clearHistory();
-                        appendSystem("Conversation history reset. You can continue chatting.");
+                        llm.rollbackHistory(1);
+                        appendSystem("History sync error — last message rolled back. Please try again.");
                     }
                     setProcessing(false);
                 });
@@ -143,12 +148,43 @@ public class ChatTopComponent extends TopComponent {
     }
 
     private void handleResponse(LlmResponse response) {
-        if (response.hasToolCall() && "run_gpt".equals(response.toolCallName)) {
-            String explanation = response.toolCallExplanation != null ? response.toolCallExplanation : "";
-            String command = response.toolCallCommand != null ? response.toolCallCommand : "";
-            String type = response.toolCallType != null ? response.toolCallType : "gpt";
+        if (!response.hasToolCall()) {
+            if (!response.text.isEmpty()) {
+                appendMsg("GIS Chat", response.text, "#2E7D32");
+            }
+            setProcessing(false);
+            return;
+        }
 
-            String display = !explanation.isEmpty() ? explanation : response.text;
+        if (toolDepth >= MAX_TOOL_ROUND_TRIPS) {
+            appendSystem("Stopped: too many consecutive tool calls.");
+            setProcessing(false);
+            return;
+        }
+
+        // Execute ALL tool calls and collect results
+        List<LlmService.ToolResult> toolResults = new ArrayList<>();
+
+        for (int i = 0; i < response.toolCalls.size(); i++) {
+            var tc = response.toolCalls.get(i);
+            if (!"run_gpt".equals(tc.name)) {
+                toolResults.add(new LlmService.ToolResult(tc.id, "Unknown tool: " + tc.name));
+                continue;
+            }
+
+            String explanation = tc.explanation != null ? tc.explanation : "";
+            String command = tc.command != null ? tc.command : "";
+            // Always auto-detect type from content. The parsed tc.type is unreliable
+            // because "type" appears many times in the JSON (tool_use, text, etc.)
+            // and the hand-rolled parser grabs the wrong one.
+            String type = detectCodeType(command);
+
+            // Show text before first tool call
+            if (i == 0 && !response.text.isEmpty()) {
+                appendMsg("GIS Chat", response.text, "#2E7D32");
+            }
+
+            String display = !explanation.isEmpty() ? explanation : "Executing...";
             appendMsg("GIS Chat", display, "#2E7D32");
 
             if (ChatSettings.getShowGeneratedCode() && !command.isEmpty()) {
@@ -161,8 +197,8 @@ public class ChatTopComponent extends TopComponent {
                         "GIS Chat - Confirm", JOptionPane.YES_NO_OPTION);
                 if (choice != JOptionPane.YES_OPTION) {
                     appendResult("Cancelled by user.", false);
-                    sendToolResult(response.toolCallId, "Cancelled by user.");
-                    return;
+                    toolResults.add(new LlmService.ToolResult(tc.id, "Cancelled by user."));
+                    continue;
                 }
             }
 
@@ -171,30 +207,33 @@ public class ChatTopComponent extends TopComponent {
                     ? CommandExecutor.runPython(command)
                     : CommandExecutor.runGpt(command);
             appendResult(result.toString(), result.success());
-
-            sendToolResult(response.toolCallId, result.toString());
-            return;
+            toolResults.add(new LlmService.ToolResult(tc.id, result.toString()));
         }
 
-        if (!response.text.isEmpty()) {
-            appendMsg("GIS Chat", response.text, "#2E7D32");
-        }
-        setProcessing(false);
+        // Send ALL tool results back and process follow-up recursively
+        toolDepth++;
+        sendToolResults(toolResults);
     }
 
-    private void sendToolResult(String toolCallId, String result) {
+    private void sendToolResults(List<LlmService.ToolResult> results) {
+        // Check if any result is an error — update status to show we're fixing it
+        boolean hasError = results.stream().anyMatch(r -> r.result().startsWith("Error:"));
+        if (hasError) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Fixing error... (attempt " + (toolDepth + 1) + ")"));
+        } else {
+            SwingUtilities.invokeLater(() -> statusLabel.setText("Processing follow-up..."));
+        }
         new Thread(() -> {
             try {
-                LlmResponse followUp = llm.sendToolResult(toolCallId, result, pendingMapContext);
-                SwingUtilities.invokeLater(() -> {
-                    if (!followUp.text.isEmpty()) {
-                        appendMsg("GIS Chat", followUp.text, "#2E7D32");
-                    }
-                    setProcessing(false);
-                });
+                LlmResponse followUp = llm.sendToolResults(results, pendingMapContext);
+                SwingUtilities.invokeLater(() -> handleResponse(followUp));
             } catch (Exception e) {
                 SwingUtilities.invokeLater(() -> {
                     appendSystem("Error: " + e.getMessage());
+                    if (e.getMessage() != null && (e.getMessage().contains("tool_result") || e.getMessage().contains("tool_use"))) {
+                        llm.rollbackHistory(1);
+                        appendSystem("History sync error — last message rolled back. Please try again.");
+                    }
                     setProcessing(false);
                 });
             }
@@ -206,7 +245,7 @@ public class ChatTopComponent extends TopComponent {
     private void appendMsg(String label, String text, String color) {
         chatHtml.append("<p style='margin:6px 0 2px 0;'><b style='color:").append(color).append(";'>")
                 .append(esc(label)).append("</b></p>")
-                .append("<p style='margin:0 0 4px 8px; white-space:pre-wrap;'>").append(esc(text)).append("</p>");
+                .append("<div style='margin:0 0 4px 8px;'>").append(markdownToHtml(text)).append("</div>");
         updateDisplay();
     }
 
@@ -226,6 +265,10 @@ public class ChatTopComponent extends TopComponent {
         String prefix = success ? "Result" : "Error";
         chatHtml.append("<p style='margin:2px 8px; color:").append(color).append("; font-size:12px;'><b>")
                 .append(prefix).append(":</b> ").append(esc(text)).append("</p>");
+        if (!success && toolDepth < MAX_TOOL_ROUND_TRIPS) {
+            chatHtml.append("<p style='margin:2px 8px; color:#F57C00; font-size:12px; font-style:italic;'>")
+                    .append("Analyzing error and working on a fix...</p>");
+        }
         updateDisplay();
     }
 
@@ -235,7 +278,167 @@ public class ChatTopComponent extends TopComponent {
         SwingUtilities.invokeLater(() -> chatDisplay.setCaretPosition(chatDisplay.getDocument().getLength()));
     }
 
+    /**
+     * Auto-detect whether code is Python or a GPT command.
+     * This is the PRIMARY type detection — never rely on the parsed type field.
+     *
+     * GPT commands are single-line, starting with a SNAP operator name
+     * (e.g. "Subset -Pregion=... -t output.dim input.dim").
+     *
+     * Everything else (multi-line code, Python keywords, etc.) is Python.
+     */
+    private static String detectCodeType(String code) {
+        if (code == null || code.isBlank()) return "gpt";
+        String trimmed = code.trim();
+
+        // Multi-line = always Python (GPT commands are single-line)
+        if (trimmed.contains("\n")) return "python";
+
+        // Python keywords / patterns
+        String lower = trimmed.toLowerCase();
+        if (trimmed.startsWith("import ") || trimmed.startsWith("from ")
+                || trimmed.startsWith("#") || trimmed.startsWith("def ")
+                || trimmed.startsWith("class ") || trimmed.startsWith("if ")
+                || trimmed.startsWith("for ") || trimmed.startsWith("while ")
+                || lower.contains("print(") || lower.contains("os.path")
+                || lower.contains("os.makedirs") || lower.contains("open(")
+                || lower.contains("ee.initialize") || lower.contains("ee.image")
+                || lower.contains("numpy") || lower.contains("rasterio")
+                || lower.contains("productio") || lower.contains("esa_snappy")
+                || lower.contains("subprocess") || lower.contains("gdal")
+                || lower.contains("pip._internal") || lower.contains("requests.get")) {
+            return "python";
+        }
+
+        // Valid GPT commands start with a known operator name pattern:
+        // single word or hyphenated word, followed by space and flags/paths
+        // e.g. "Subset -Pregion=..." or "Terrain-Correction -t ..."
+        if (trimmed.matches("^[A-Z][a-zA-Z-]+(\\s.*)?$")) {
+            return "gpt";
+        }
+
+        // Default: if it doesn't look like a GPT operator, assume Python
+        return "python";
+    }
+
     private static String esc(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    /**
+     * Convert basic markdown to HTML for display in JEditorPane.
+     * Handles: headers, bold, inline code, code blocks, lists, tables, line breaks.
+     */
+    private static String markdownToHtml(String md) {
+        String escaped = esc(md);
+        StringBuilder html = new StringBuilder();
+        String[] lines = escaped.split("\n");
+        boolean inCodeBlock = false;
+        boolean inTable = false;
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            String trimmed = line.trim();
+
+            // Code blocks (```)
+            if (trimmed.startsWith("```")) {
+                if (inCodeBlock) {
+                    html.append("</pre>");
+                    inCodeBlock = false;
+                } else {
+                    html.append("<pre style='background:#F5F5F5; border:1px solid #DDD; padding:6px; margin:4px 0; font-size:12px;'>");
+                    inCodeBlock = true;
+                }
+                continue;
+            }
+            if (inCodeBlock) {
+                html.append(line).append("\n");
+                continue;
+            }
+
+            // Skip table separator rows (|---|---|)
+            if (trimmed.matches("\\|[\\s\\-:|]+\\|")) {
+                continue;
+            }
+
+            // Table rows (| col | col |)
+            if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+                if (!inTable) {
+                    html.append("<table style='border-collapse:collapse; margin:4px 0; font-size:12px;'>");
+                    inTable = true;
+                }
+                html.append("<tr>");
+                String[] cells = trimmed.substring(1, trimmed.length() - 1).split("\\|");
+                for (String cell : cells) {
+                    html.append("<td style='border:1px solid #CCC; padding:2px 6px;'>").append(cell.trim()).append("</td>");
+                }
+                html.append("</tr>");
+                continue;
+            } else if (inTable) {
+                html.append("</table>");
+                inTable = false;
+            }
+
+            // Headers
+            if (trimmed.startsWith("### ")) {
+                html.append("<p style='margin:6px 0 2px 0; font-weight:bold; font-size:13px;'>").append(trimmed.substring(4)).append("</p>");
+                continue;
+            }
+            if (trimmed.startsWith("## ")) {
+                html.append("<p style='margin:8px 0 2px 0; font-weight:bold; font-size:14px;'>").append(trimmed.substring(3)).append("</p>");
+                continue;
+            }
+            if (trimmed.startsWith("# ")) {
+                html.append("<p style='margin:8px 0 2px 0; font-weight:bold; font-size:15px;'>").append(trimmed.substring(2)).append("</p>");
+                continue;
+            }
+
+            // Horizontal rule
+            if (trimmed.equals("---") || trimmed.equals("***")) {
+                html.append("<hr style='margin:4px 0;'>");
+                continue;
+            }
+
+            // List items
+            if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                String content = inlineFormat(trimmed.substring(2));
+                html.append("<p style='margin:1px 0 1px 16px;'>&bull; ").append(content).append("</p>");
+                continue;
+            }
+            if (trimmed.matches("^\\d+\\.\\s.*")) {
+                String content = inlineFormat(trimmed.replaceFirst("^\\d+\\.\\s", ""));
+                html.append("<p style='margin:1px 0 1px 16px;'>").append(trimmed.split("\\s", 2)[0]).append(" ").append(content).append("</p>");
+                continue;
+            }
+
+            // Blockquote
+            if (trimmed.startsWith("&gt; ")) {
+                html.append("<p style='margin:2px 0; padding-left:8px; border-left:3px solid #CCC; color:#666;'>")
+                        .append(inlineFormat(trimmed.substring(5))).append("</p>");
+                continue;
+            }
+
+            // Empty line
+            if (trimmed.isEmpty()) {
+                html.append("<br>");
+                continue;
+            }
+
+            // Normal paragraph
+            html.append("<p style='margin:2px 0;'>").append(inlineFormat(line)).append("</p>");
+        }
+
+        if (inCodeBlock) html.append("</pre>");
+        if (inTable) html.append("</table>");
+        return html.toString();
+    }
+
+    /** Convert inline markdown: **bold**, `code`, file paths. */
+    private static String inlineFormat(String text) {
+        // Bold: **text**
+        text = text.replaceAll("\\*\\*(.+?)\\*\\*", "<b>$1</b>");
+        // Inline code: `text`
+        text = text.replaceAll("`(.+?)`", "<code style='background:#F0F0F0; padding:0 3px; font-size:12px;'>$1</code>");
+        return text;
     }
 }

@@ -70,4 +70,12 @@ public class ChatSettings {
     public static void setShowGeneratedCode(boolean v) {
         PREFS.putBoolean("showGeneratedCode", v);
     }
+
+    public static String getGeeProject() {
+        return PREFS.get("geeProject", "");
+    }
+
+    public static void setGeeProject(String project) {
+        PREFS.put("geeProject", project != null ? project : "");
+    }
 }
