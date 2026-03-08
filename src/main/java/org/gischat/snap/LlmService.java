@@ -127,7 +127,8 @@ public class LlmService {
                 "                sz = os.path.getsize(tile_path) / 1e6\n" +
                 "                print(f'[OK] tile_{r}_{c}.tif ({sz:.1f} MB)')\n" +
                 "            except Exception as e:\n" +
-                "                if 'must be less than or equal to' in str(e):\n" +
+                "                err = str(e)\n" +
+                "                if 'must be less than or equal to' in err or '400' in err or 'Bad Request' in err:\n" +
                 "                    print(f'[RETRY] Grid {grid}x{grid} too coarse -> {grid*2}x{grid*2}')\n" +
                 "                    for p in tile_paths:\n" +
                 "                        if os.path.exists(p): os.remove(p)\n" +
