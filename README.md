@@ -139,6 +139,22 @@ SNAPChat/
 - Keys are never transmitted anywhere except to the configured AI provider endpoint
 - All LLM communication uses HTTPS (except local Ollama)
 
+## Citation
+
+If you use GIS Chat in your research, please cite the preprint:
+
+> Fehér, Zs. Z. (2026). GIS Chat: Bridging Natural Language and Desktop GIS Automation with LLM-Powered GIS Plugins. *EarthArXiv preprint, submitted to SoftwareX*. DOI: [10.31223/X54Z09](https://doi.org/10.31223/X54Z09)
+
+```bibtex
+@article{feher2026gischat,
+  title={GIS Chat: Bridging Natural Language and Desktop GIS Automation with LLM-Powered GIS Plugins},
+  author={Feh{\'e}r, Zsolt Zolt{\'a}n},
+  year={2026},
+  doi={10.31223/X54Z09},
+  note={EarthArXiv preprint, submitted to SoftwareX}
+}
+```
+
 ## License
 
 [MIT](LICENSE) - Zsolt Zoltan Feher
